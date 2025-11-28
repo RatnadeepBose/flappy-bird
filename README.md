@@ -12,6 +12,16 @@ No frameworks. No installation. Just open and play.
 
 ---
 
+## 📱 Screenshots
+
+### Desktop Version
+<img src="https://github.com/RatnadeepBose/flappy-bird/blob/main/Screenshot%202025-11-29%20031618.png?raw=true" width="600"/>
+
+### Mobile Version  
+<img src="https://github.com/RatnadeepBose/flappy-bird/blob/main/Screenshot%202025-11-29%20031656.png?raw=true" width="300"/>
+
+---
+
 ## 🎮 How to Play
 
 1. Open **`index.html`** in any browser  
@@ -27,7 +37,9 @@ No frameworks. No installation. Just open and play.
 ├── index.html
 ├── bird.png
 ├── background-music.mp3
-└── crash-sound.mp3
+├── crash-sound.mp3
+├── Screenshot 2025-11-29 031618.png (Desktop)
+└── Screenshot 2025-11-29 031656.png (Mobile)
 ```
 
 ---
