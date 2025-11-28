@@ -6,7 +6,7 @@ No frameworks. No installation. Just open and play.
 
 ---
 
-## 🖼 Preview
+## 🖼 MODI
 
 <img src="https://raw.githubusercontent.com/RatnadeepBose/flappy-bird/main/bird.png" width="120"/>
 
