@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/png" href="bird.png">
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Modi Flappy</title>
+<style>
+  /* Reset + layout */
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:#000;color:#fff;-webkit-font-smoothing:antialiased}
+  body{font-family:"Segoe UI",Tahoma,Helvetica,Arial;overflow:hidden;touch-action:none;overscroll-behavior:none}
+
+  /* canvas fills screen */
+  #game-container{position:fixed;inset:0;display:block}
+  canvas{display:block;width:100vw;height:100vh}
+
+  /* UI overlay */
+  #ui-overlay{position:fixed;inset:0;pointer-events:none}
+  .screen{
+    position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.68);text-align:center;padding:28px;pointer-events:all;z-index:30;
+  }
+  h1{font-size:3.6rem;color:#f1c40f;text-shadow:3px 3px 0 #000;margin-bottom:12px}
+  .bird-preview{width:90px;height:72px;margin:18px auto;animation:float 2.8s ease-in-out infinite}
+  @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-16px)}}
+  button{
+    padding:12px 32px;border-radius:999px;border:none;background:linear-gradient(#f1c40f,#f39c12);
+    font-weight:800;color:#2c3e50;cursor:pointer;box-shadow:0 6px 0 #d35400,0 10px 20px rgba(0,0,0,.25);
+  }
+  #score-display,#high-score-display{position:fixed;top:16px;font-weight:900;text-shadow:2px 2px 0 #000;z-index:25}
+  #score-display{left:16px;font-size:1.6rem}
+  #high-score-display{right:16px;font-size:1.05rem}
+  #sound-toggle{position:fixed;right:16px;bottom:18px;width:48px;height:48px;border-radius:999px;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:25;pointer-events:all}
+  #sound-toggle svg{width:22px;height:22px;fill:#fff}
+  @media (max-width:520px){h1{font-size:2.4rem}}
+</style>
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="game-canvas" aria-label="Flappy Bird game"></canvas>
+
+    <div id="ui-overlay">
+      <div id="score-display">Score: 0</div>
+      <div id="high-score-display">High Score: 0</div>
+
+      <div id="start-screen" class="screen">
+        <h1>Modi Flappy</h1>
+        <div class="bird-preview"><img id="bird-preview-img" src="bird.png" alt="Bird" style="width:100%;height:100%;object-fit:contain"></div>
+        <button id="start-button">Start Game</button>
+        <p style="margin-top:12px;color:#ddd;font-size:0.95rem">Tap, click, or press Space / ↑ to flap</p>
+      </div>
+
+      <div id="game-over-screen" class="screen" style="display:none">
+        <h1>Game Over</h1>
+        <div id="final-score" style="font-size:1.35rem;margin:12px 0">Score: 0</div>
+        <div id="new-high-score" style="display:none;color:#f1c40f;margin-bottom:12px">New High Score! 🎉</div>
+        <button id="restart-button">Play Again</button>
+      </div>
+    </div>
+
+    <div id="sound-toggle" title="Toggle sound" role="button" aria-pressed="true">
+      <svg id="sound-icon" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3z"/></svg>
+    </div>
+  </div>
+
+<script>
+/* ======= Responsive Flappy — Single File =======
+   - DPR-correct canvas (crisp on high-DPI)
+   - delta-time physics (frame-rate independent)
+   - pointer/touch/keyboard input
+   - audio unlock on first user interaction
+   - robust pipe spawn/score/collision logic
+   - high score saved as Number
+*/
+
+const canvas = document.getElementById('game-canvas');
+const ctx = canvas.getContext('2d', { alpha: false });
+
+const startScreen = document.getElementById('start-screen');
+const gameOverScreen = document.getElementById('game-over-screen');
+const startButton = document.getElementById('start-button');
+const restartButton = document.getElementById('restart-button');
+const scoreDisplay = document.getElementById('score-display');
+const highScoreDisplay = document.getElementById('high-score-display');
+const finalScore = document.getElementById('final-score');
+const newHighEl = document.getElementById('new-high-score');
+const soundToggle = document.getElementById('sound-toggle');
+const soundIcon = document.getElementById('sound-icon');
+
+let DPR = Math.max(1, window.devicePixelRatio || 1);
+let cssW = innerWidth, cssH = innerHeight;
+
+function resize() {
+  DPR = Math.max(1, window.devicePixelRatio || 1);
+  cssW = Math.max(320, window.innerWidth);
+  cssH = Math.max(300, window.innerHeight);
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  canvas.width = Math.floor(cssW * DPR);
+  canvas.height = Math.floor(cssH * DPR);
+  // map drawing coordinates to CSS pixels
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  // recompute sizes dependent on screen
+  groundHeight = Math.max(48, cssH * 0.10);
+  pipes.reset();
+  bird.reset();
+}
+window.addEventListener('resize', resize);
+
+/* ----- Game state ----- */
+let running = false;
+let lastTS = performance.now();
+let spawnAccum = 0;
+let score = 0;
+let highScore = Number(localStorage.getItem('flappyHighScore')) || 0;
+highScoreDisplay.textContent = `High Score: ${highScore}`;
+let soundEnabled = true;
+
+/* ----- Audio (local files or URLs) ----- */
+const backgroundMusic = new Audio('background-music.mp3'); backgroundMusic.loop = true; backgroundMusic.volume = 0.35;
+const crashSound = new Audio('crash-sound.mp3'); crashSound.volume = 0.6;
+const flapSound = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-bird-chirp-when-flying-1211.mp3'); flapSound.volume = 0.36;
+const scoreSound = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-unlock-game-notification-253.mp3'); scoreSound.volume = 0.32;
+
+function safePlay(audio) {
+  if(!soundEnabled) return;
+  audio.currentTime = 0;
+  audio.play().catch(()=>{/* mobile autoplay blocked until user gesture; ignored */});
+}
+
+function tryUnlockAudio() {
+  // attempt to play background briefly on first user gesture
+  if(soundEnabled) backgroundMusic.play().catch(()=>{});
+  window.removeEventListener('pointerdown', tryUnlockAudio);
+  window.removeEventListener('touchstart', tryUnlockAudio);
+}
+
+/* ----- Bird ----- */
+const bird = {
+  x:0,y:0,w:0,h:0,vel:0,rotation:0,
+  gravity:1200, // px/s^2
+  jump:-380,    // px/s impulse
+  image: new Image(), imageLoaded:false, natW:0,natH:0,
+  init() {
+    this.image.src = 'bird.png';
+    this.image.onload = () => { this.imageLoaded = true; this.natW = this.image.naturalWidth; this.natH = this.image.naturalHeight; this.reset(); };
+    this.image.onerror = () => { this.imageLoaded = false; this.reset(); };
+  },
+  reset() {
+    this.x = cssW * 0.22;
+    this.y = cssH * 0.5;
+    const baseW = Math.max(26, cssW * 0.06);
+    if(this.imageLoaded && this.natW>0) {
+      const aspect = this.natH / this.natW;
+      this.w = baseW;
+      this.h = Math.max(18, baseW * aspect);
+    } else {
+      this.w = baseW;
+      this.h = Math.max(18, baseW * 0.8);
+    }
+    this.vel = 0;
+    this.rotation = 0;
+  },
+  update(dt) {
+    if(!running) return;
+    this.vel += this.gravity * dt;
+    this.y += this.vel * dt;
+    // rotation from velocity
+    const maxR = Math.PI/4;
+    this.rotation = Math.max(-maxR, Math.min(maxR, this.vel * 0.0016));
+    // ceiling
+    if(this.y - this.h/2 < 0) { this.y = this.h/2; this.vel = Math.max(0, this.vel); }
+    // ground collision
+    if(this.y + this.h/2 >= cssH - groundHeight) {
+      this.y = cssH - groundHeight - this.h/2;
+      gameOver();
+    }
+  },
+  draw() {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.rotation);
+    if(this.imageLoaded) {
+      ctx.drawImage(this.image, -this.w/2, -this.h/2, this.w, this.h);
+    } else {
+      // fallback circle-bird
+      ctx.fillStyle = '#f1c40f';
+      ctx.beginPath(); ctx.ellipse(0,0,this.w/2,this.h/2,0,0,Math.PI*2); ctx.fill();
+      // eye
+      ctx.fillStyle='white'; ctx.beginPath(); ctx.arc(this.w/4, -this.h/8, this.w/8,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(this.w/4+2, -this.h/8, this.w/16,0,Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  },
+  flap() {
+    this.vel = this.jump;
+    safePlay(flapSound);
+  }
+};
+bird.init();
+
+/* ----- Pipes ----- */
+let groundHeight = Math.max(48, cssH * 0.10);
+const pipes = {
+  list: [],
+  gap: Math.max(90, cssH * 0.35),
+  spawnInterval: 1500, // ms
+  speed: Math.max(150, cssW * 0.30), // px/s
+  width: Math.max(48, cssW * 0.12),
+  reset() {
+    this.list = [];
+    this.gap = Math.max(90, cssH * 0.35);
+    this.spawnInterval = Math.max(1100, 1400 - Math.floor(cssW/10)); // adaptive
+    this.speed = Math.max(140, cssW * 0.28);
+    this.width = Math.max(44, cssW * 0.11);
+  },
+  spawn() {
+    const minTop = 48;
+    const maxTop = Math.max(minTop, cssH - groundHeight - this.gap - 120);
+    const top = Math.floor(minTop + Math.random() * Math.max(1, maxTop - minTop));
+    this.list.push({ x: cssW + 10, top: top, width: this.width, gap: this.gap, scored: false });
+  },
+  update(dt) {
+    if(!running) return;
+    for(let i = this.list.length - 1; i >= 0; i--) {
+      const p = this.list[i];
+      p.x -= this.speed * dt;
+      // scoring: when pipe's right < bird.x and not yet scored
+      if(!p.scored && (p.x + p.width) < (bird.x - bird.w/2)) {
+        p.scored = true;
+        score++;
+        scoreDisplay.textContent = `Score: ${score}`;
+        safePlay(scoreSound);
+      }
+      // collision (AABB against bird box)
+      const birdLeft = bird.x - bird.w/2, birdRight = bird.x + bird.w/2;
+      const birdTop = bird.y - bird.h/2, birdBottom = bird.y + bird.h/2;
+      const pipeLeft = p.x, pipeRight = p.x + p.width;
+      const topBottom = p.top, bottomTop = p.top + p.gap;
+      const overlapX = birdRight > pipeLeft && birdLeft < pipeRight;
+      const hitTop = overlapX && birdTop < topBottom;
+      const hitBottom = overlapX && birdBottom > bottomTop;
+      if(hitTop || hitBottom) {
+        gameOver();
+      }
+      // remove off-screen
+      if(p.x + p.width < -50) this.list.splice(i,1);
+    }
+  },
+  draw() {
+    for(const p of this.list) {
+      // top pipe
+      const g1 = ctx.createLinearGradient(p.x, 0, p.x + p.width, p.top);
+      g1.addColorStop(0, '#2ecc71'); g1.addColorStop(1, '#27ae60');
+      ctx.fillStyle = g1; ctx.fillRect(p.x, 0, p.width, p.top);
+      // cap
+      ctx.fillStyle = '#27ae60'; ctx.fillRect(p.x - 6, p.top - 12, p.width + 12, 12);
+      // bottom pipe
+      const bottomY = p.top + p.gap;
+      const bottomH = cssH - groundHeight - bottomY;
+      const g2 = ctx.createLinearGradient(p.x, bottomY, p.x + p.width, bottomY + bottomH);
+      g2.addColorStop(0, '#2ecc71'); g2.addColorStop(1, '#27ae60');
+      ctx.fillStyle = g2; ctx.fillRect(p.x, bottomY, p.width, bottomH);
+      ctx.fillStyle = '#27ae60'; ctx.fillRect(p.x - 6, bottomY, p.width + 12, 12);
+    }
+  }
+};
+
+/* ----- Background ----- */
+const background = {
+  draw() {
+    // sky
+    const g = ctx.createLinearGradient(0,0,0,cssH);
+    g.addColorStop(0,'#70c5ce'); g.addColorStop(1,'#8cd0d9');
+    ctx.fillStyle = g; ctx.fillRect(0,0,cssW,cssH);
+    // clouds
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    const t = performance.now() * 0.0007;
+    for(let i=0;i<5;i++){
+      const x = (cssW/5)*i + 60;
+      const y = 80 + Math.sin(t + i) * 18;
+      const s = 26 + i*6;
+      ctx.beginPath();
+      ctx.arc(x,y,s,0,Math.PI*2);
+      ctx.arc(x+s*0.9,y-s*0.3,s*0.7,0,Math.PI*2);
+      ctx.arc(x+s*1.6,y,s,0,Math.PI*2);
+      ctx.fill();
+    }
+    // ground
+    ctx.fillStyle = '#ded895'; ctx.fillRect(0, cssH - groundHeight, cssW, groundHeight);
+    ctx.fillStyle = '#c4b75b'; ctx.fillRect(0, cssH - groundHeight, cssW, 16);
+  }
+};
+
+/* ----- Core Loop ----- */
+function startGame() {
+  running = true;
+  score = 0; scoreDisplay.textContent = `Score: ${score}`;
+  spawnAccum = 0;
+  startScreen.style.display = 'none';
+  gameOverScreen.style.display = 'none';
+  pipes.reset();
+  bird.reset();
+  // let audio attempt to play (unlocked on first gesture)
+  safePlay(backgroundMusic);
+  lastTS = performance.now();
+}
+
+function gameOver() {
+  if(!running) return;
+  running = false;
+  if(soundEnabled) safePlay(crashSound);
+  backgroundMusic.pause();
+  // high score
+  if(score > highScore) {
+    highScore = score;
+    localStorage.setItem('flappyHighScore', String(highScore));
+    highScoreDisplay.textContent = `High Score: ${highScore}`;
+    newHighEl.style.display = 'block';
+  } else newHighEl.style.display = 'none';
+  finalScore.textContent = `Score: ${score}`;
+  gameOverScreen.style.display = 'flex';
+}
+
+function frame(now) {
+  const dtMs = Math.min(48, now - lastTS);
+  const dt = Math.max(0, dtMs) / 1000;
+  lastTS = now;
+
+  if(running) {
+    // spawn accumulator
+    spawnAccum += dtMs;
+    if(spawnAccum >= pipes.spawnInterval) {
+      spawnAccum = 0;
+      pipes.spawn();
+    }
+    // update
+    bird.update(dt);
+    pipes.update(dt);
+  }
+
+  // draw
+  background.draw();
+  pipes.draw();
+  bird.draw();
+
+  requestAnimationFrame(frame);
+}
+
+/* ----- Input handlers ----- */
+function handlePrimaryAction(e) {
+  // e can be PointerEvent or Keyboard
+  if(!running) {
+    startGame();
+    tryUnlockAudio();
+    return;
+  }
+  bird.flap();
+  tryUnlockAudio();
+}
+
+canvas.addEventListener('pointerdown', (e) => { e.preventDefault(); handlePrimaryAction(e); }, {passive:false});
+document.addEventListener('keydown', (e) => {
+  if(e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); handlePrimaryAction(e); }
+}, {passive:false});
+
+// start/restart UI buttons
+startButton.addEventListener('click', ()=>{ startGame(); tryUnlockAudio(); });
+restartButton.addEventListener('click', ()=>{ startGame(); tryUnlockAudio(); });
+
+// sound toggle
+soundToggle.addEventListener('click', ()=>{
+  soundEnabled = !soundEnabled;
+  soundToggle.setAttribute('aria-pressed', soundEnabled ? 'true' : 'false');
+  if(soundEnabled) { soundIcon.innerHTML = '<path d="M3 9v6h4l5 5V4L7 9H3z"/>'; safePlay(backgroundMusic); }
+  else { soundIcon.innerHTML = '<path d="M3.63 3.63a.996.996 0 0 0 0 1.41L7.29 9H6c-1.1 0-2 .9-2 2v2c0 1.1.9 2 2 2h1.29l-3.66 3.66a.996.996 0 1 0 1.41 1.41L16.37 6.37c.39-.39.39-1.02 0-1.41a.996.996 0 0 0-1.41 0z"/>'; backgroundMusic.pause(); }
+});
+
+/* pause / visibility behavior */
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden && running){
+    // pause game visually and stop music — show game-over to avoid weird resumed state
+    running = false;
+    backgroundMusic.pause();
+    finalScore.textContent = `Score: ${score}`;
+    gameOverScreen.style.display = 'flex';
+  }
+});
+
+/* init */
+resize();
+pipes.reset();
+bird.reset();
+lastTS = performance.now();
+requestAnimationFrame(frame);
+
+// unlock audio on first gesture (covers some browsers)
+window.addEventListener('pointerdown', tryUnlockAudio, {passive:true});
+window.addEventListener('touchstart', tryUnlockAudio, {passive:true});
+</script>
+</body>
+</html>
