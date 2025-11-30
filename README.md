@@ -38,8 +38,6 @@ No frameworks. No installation. Just open and play.
 ├── bird.png
 ├── background-music.mp3
 ├── crash-sound.mp3
-├── Screenshot 2025-11-29 031618.png (Desktop)
-└── Screenshot 2025-11-29 031656.png (Mobile)
 ```
 
 ---
