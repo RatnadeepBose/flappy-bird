@@ -5,7 +5,7 @@
 
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Modi Flappy</title>
+<title> Flappy Game</title>
 <style>
   /* Reset + layout */
   *{box-sizing:border-box;margin:0;padding:0}
@@ -39,14 +39,14 @@
 </head>
 <body>
   <div id="game-container">
-    <canvas id="game-canvas" aria-label="Flappy Bird game"></canvas>
+    <canvas id="game-canvas" aria-label="Flappy Game Bird game"></canvas>
 
     <div id="ui-overlay">
       <div id="score-display">Score: 0</div>
       <div id="high-score-display">High Score: 0</div>
 
       <div id="start-screen" class="screen">
-        <h1>Modi Flappy</h1>
+        <h1> Flappy Game</h1>
         <div class="bird-preview"><img id="bird-preview-img" src="bird.png" alt="Bird" style="width:100%;height:100%;object-fit:contain"></div>
         <button id="start-button">Start Game</button>
         <p style="margin-top:12px;color:#ddd;font-size:0.95rem">Tap, click, or press Space / ↑ to flap</p>
@@ -66,7 +66,7 @@
   </div>
 
 <script>
-/* ======= Responsive Flappy — Single File =======
+/* ======= Responsive Flappy Game — Single File =======
    - DPR-correct canvas (crisp on high-DPI)
    - delta-time physics (frame-rate independent)
    - pointer/touch/keyboard input
@@ -114,7 +114,7 @@ let running = false;
 let lastTS = performance.now();
 let spawnAccum = 0;
 let score = 0;
-let highScore = Number(localStorage.getItem('flappyHighScore')) || 0;
+let highScore = Number(localStorage.getItem('Flappy GameHighScore')) || 0;
 highScoreDisplay.textContent = `High Score: ${highScore}`;
 let soundEnabled = true;
 
@@ -316,7 +316,7 @@ function gameOver() {
   // high score
   if(score > highScore) {
     highScore = score;
-    localStorage.setItem('flappyHighScore', String(highScore));
+    localStorage.setItem('Flappy GameHighScore', String(highScore));
     highScoreDisplay.textContent = `High Score: ${highScore}`;
     newHighEl.style.display = 'block';
   } else newHighEl.style.display = 'none';
