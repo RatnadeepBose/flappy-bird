@@ -8,17 +8,17 @@ No frameworks. No installation. Just open and play.
 
 ## 🖼 
 
-<img src="https://raw.githubusercontent.com/RatnadeepBose/Flappy Game-bird/main/bird.png" width="120"/>
+<img src="" width="120"/>
 
 ---
 
 ## 📱 Screenshots
 
 ### Desktop Version
-<img src="https://github.com/RatnadeepBose/Flappy Game-bird/blob/main/Screenshot%202025-11-29%20031618.png?raw=true" width="600"/>
+<img src="" width="600"/>
 
 ### Mobile Version  
-<img src="https://github.com/RatnadeepBose/Flappy Game-bird/blob/main/Screenshot%202025-11-29%20031656.png?raw=true" width="300"/>
+<img src="" width="300"/>
 
 ---
 
