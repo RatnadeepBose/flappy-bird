@@ -37,7 +37,8 @@ No frameworks. No installation. Just open and play.
 ├── index.html
 ├── bird.png
 ├── background-music.mp3
-├── crash-sound.mp3
+└──crash-sound.mp3
+
 ```
 
 ---
