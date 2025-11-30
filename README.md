@@ -8,17 +8,17 @@ No frameworks. No installation. Just open and play.
 
 ## 🖼 
 
-<img src="" width="120"/>
+<img src="bird.png" width="120"/>
 
 ---
 
 ## 📱 Screenshots
 
 ### Desktop Version
-<img src="" width="600"/>
+<img src="image.png" width="600"/>
 
 ### Mobile Version  
-<img src="" width="300"/>
+<img src="image copy.png" width="300"/>
 
 ---
 
